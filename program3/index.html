@@ -15,6 +15,10 @@
         <input type="checkbox" id="checkBoxRotate" value="rotate" onchange="setRotation()">
         <label for="checkBoxRotate">Rotate</label>
     </div>
+    <label for="scaleX">scaleX</label>
+    <input type="range" id="scaleX" min="-1.0" max="2.0" step="0.01" oninput="rangeChange()">
+    <label for="scaleY">scaleY</label>
+    <input type="range" id="scaleY" min="-1.0" max="2.0" step="0.01" oninput="rangeChange()">
     
     <script src="program3.js"></script>
 </body>

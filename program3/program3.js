@@ -54,6 +54,8 @@ function redraw(x, y, width){
                 out vec3 fragColor;
                 uniform float rotationAngle;
                 //vec2 rotationCoeffs = vec2(0, 0);
+                uniform float scaleX;
+                uniform float scaleY;
 
                 void main(){
                     //rotationCoeffs[0] = sin(rotationAngle);
@@ -63,8 +65,8 @@ function redraw(x, y, width){
                     float cosA = cos(rad);
                     float sinA = sin(rad);
                     vec2 newPos = vec2(
-                        vertPos.x * cosA - vertPos.y * sinA,
-                        vertPos.x * sinA + vertPos.y * cosA
+                        (vertPos.x * scaleX) * cosA - (vertPos.y * scaleY) * sinA,
+                        (vertPos.x * scaleX) * sinA + (vertPos.y * scaleY) * cosA
                     );
 
                     /*for(int i = 0; i < vertPos.size() - 1; i += 2){
@@ -170,6 +172,12 @@ function redraw(x, y, width){
         gl.useProgram(program);
         let angleLocation = gl.getUniformLocation(program, 'rotationAngle');
         gl.uniform1f(angleLocation, currAngle);
+
+        let scaleXLocation = gl.getUniformLocation(program, 'scaleX');
+        gl.uniform1f(scaleXLocation, document.getElementById("scaleX").value);
+
+        let scaleYLocation = gl.getUniformLocation(program, 'scaleY');
+        gl.uniform1f(scaleYLocation, document.getElementById("scaleY").value);
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); //4 vertices
     }
