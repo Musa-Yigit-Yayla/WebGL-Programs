@@ -1,4 +1,5 @@
 let currAngle = 0;
+let intervalId;
 
 function setRotation(){
     let updateAngle = function(){
@@ -10,12 +11,18 @@ function setRotation(){
         }
         rangeChange(); //redraw implicitly
     }
+    
     let checkBox = document.getElementById("checkBoxRotate");
-    if(checkBox.value){
-        setTimeout(updateAngle, 20); //20 ms
+    console.log("checkBox.value is: " + checkBox.checked);
+    if(checkBox.checked){
+        intervalId = setInterval(updateAngle, 20); //20 ms
+        console.log(intervalId);
     }
     else{
-        clearTimeout();
+        console.log("Clear interval has been entered " + intervalId);
+        if(intervalId !== null && intervalId !== undefined){
+            clearInterval(intervalId);
+        }
     }
 }
 
@@ -46,12 +53,19 @@ function redraw(x, y, width){
                 in vec3 vertColor;
                 out vec3 fragColor;
                 uniform float rotationAngle;
-                vec2 rotationCoeffs = vec2(0, 0);
+                //vec2 rotationCoeffs = vec2(0, 0);
 
                 void main(){
-                    rotationCoeffs[0] = sin(rotationAngle);
-                    rotationCoeffs[1] = cos(rotationAngle);
-                    vec2 newPos = vertPos * rotationCoeffs;
+                    //rotationCoeffs[0] = sin(rotationAngle);
+                    //rotationCoeffs[1] = cos(rotationAngle);
+
+                    float rad = radians(rotationAngle);
+                    float cosA = cos(rad);
+                    float sinA = sin(rad);
+                    vec2 newPos = vec2(
+                        vertPos.x * cosA - vertPos.y * sinA,
+                        vertPos.x * sinA + vertPos.y * cosA
+                    );
 
                     /*for(int i = 0; i < vertPos.size() - 1; i += 2){
                         vertPos[i] += rotationCoeffs[0];
@@ -96,7 +110,6 @@ function redraw(x, y, width){
         let randGreen = Math.max(1 - Math.random(), 0);
         let randBlue = Math.max(1 - Math.random(), 0);
 
-        console.log("Random generated colors are: " + randRed + ", " + randGreen + ", " + randBlue);
         //create buffers
         const vertAttributes = {
             
@@ -118,7 +131,7 @@ function redraw(x, y, width){
             vertAttributes.colors.data[counter++] = (randBlue);
             //console.log(vertAttributes.colors.data[counter - 1]);
         }
-        console.log(vertAttributes.colors.data.toString());
+        //console.log(vertAttributes.colors.data.toString());
         let posBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, vertAttributes.positions.data, gl.STATIC_DRAW);

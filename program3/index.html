@@ -11,7 +11,11 @@
     <input type="range" id="x-slider" min="-600" max="600" oninput="rangeChange()">
     <label for="y-slider">y</label>
     <input type="range" id="y-slider" min="-600" max="600" oninput="rangeChange()">
-    <input type="check" id="checkBoxRotate" onchange="setRotation()">
+    <div>
+        <input type="checkbox" id="checkBoxRotate" value="rotate" onchange="setRotation()">
+        <label for="checkBoxRotate">Rotate</label>
+    </div>
+    
     <script src="program3.js"></script>
 </body>
 </html>
