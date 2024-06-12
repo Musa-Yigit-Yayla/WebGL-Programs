@@ -1,3 +1,24 @@
+let currAngle = 0;
+
+function setRotation(){
+    let updateAngle = function(){
+        if(currAngle === 360){
+            currAngle = 0;
+        }
+        else{
+            currAngle++;
+        }
+        rangeChange(); //redraw implicitly
+    }
+    let checkBox = document.getElementById("checkBoxRotate");
+    if(checkBox.value){
+        setTimeout(updateAngle, 20); //20 ms
+    }
+    else{
+        clearTimeout();
+    }
+}
+
 function rangeChange(){
     //bind this to onChange of sliders
     let currX = document.getElementById("x-slider").value;
@@ -24,10 +45,21 @@ function redraw(x, y, width){
                 in vec2 vertPos;
                 in vec3 vertColor;
                 out vec3 fragColor;
+                uniform float rotationAngle;
+                vec2 rotationCoeffs = vec2(0, 0);
 
                 void main(){
+                    rotationCoeffs[0] = sin(rotationAngle);
+                    rotationCoeffs[1] = cos(rotationAngle);
+                    vec2 newPos = vertPos * rotationCoeffs;
+
+                    /*for(int i = 0; i < vertPos.size() - 1; i += 2){
+                        vertPos[i] += rotationCoeffs[0];
+                        vertPos[i + 1] += rotationCoeffs[1];
+                    }*/
+
                     fragColor = vertColor;
-                    gl_Position = vec4(vertPos, 0, 1);
+                    gl_Position = vec4(newPos, 0, 1);
                 }`,
             fs: `#version 300 es
                 precision mediump float;
@@ -105,6 +137,8 @@ function redraw(x, y, width){
         let colorPtr = gl.vertexAttribPointer(attributeLocation,vertAttributes.colors.componentCount, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(attributeLocation);
 
+        
+
         // Check for shader compile errors
         if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
             console.error("Vertex Shader Error: " + gl.getShaderInfoLog(vertexShader));
@@ -121,6 +155,8 @@ function redraw(x, y, width){
         }
         //specify random colors
         gl.useProgram(program);
+        let angleLocation = gl.getUniformLocation(program, 'rotationAngle');
+        gl.uniform1f(angleLocation, currAngle);
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); //4 vertices
     }
