@@ -174,9 +174,9 @@ function modelCube(){
         if(singleColor){
             colorArr = new Float32Array(cubeModel.triangles.length * 3);
             for(let i = 0; i < cubeModel.triangles.length; i++){
-                colorArr[0] = FIXED_R;
-                colorArr[1] = FIXED_G;
-                colorArr[2] = FIXED_B;
+                colorArr[i] = FIXED_R;
+                colorArr[i + 1] = FIXED_G;
+                colorArr[i + 2] = FIXED_B;
             }
         }
         else{
