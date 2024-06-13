@@ -18,6 +18,10 @@ const RIGHT_R = 0.0;
 const RIGHT_G = 0.8;
 const RIGHT_B = 0.4;
 
+const FIXED_R = 0.4;
+const FIXED_G = 0.3;
+const FIXED_B = 0.2;
+
 class Triangle{
     constructor(coordinates, colors){
         this.coordinates = coordinates;
@@ -33,12 +37,14 @@ class Model{
     }
 }
 
+
 function modelCube(){
     let canvas = document.getElementById("canvas");
-    let gl = document.getContext('webgl2');
-
+    let gl = canvas.getContext('webgl2');
+    console.log("gl yields: " + gl);
     if(gl){
-        gl.clearColor(0, 0, 0, 1);
+        console.log("FREEMAN");
+        gl.clearColor(1.0, 0.0, 1.0, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         //first fill out the model for passing to the GPU using vertex buffer
@@ -112,16 +118,16 @@ function modelCube(){
 
                 void main(){
                     fragColor = vertColor;
-                    gl_Pos = vec4(vertPos, 1);
+                    gl_Position = vec4(vertPos, 1.0);
                 }
                 `,
             fs: `#version 300 es
                 precision mediump float;
                 in vec3 fragColor;
-                out vec4 fragColor;
+                out vec4 outColor;
 
                 void main(){
-                    fragColor = vec4(fragColor, 1);
+                    outColor = vec4(fragColor, 1.0);
                 }
                 `
         };
@@ -143,13 +149,11 @@ function modelCube(){
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
 
-
-
-
+        //pass the pos buffer
         let posBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
 
-        let posArray = [];
+        let posArray = new Float32Array(cubeModel.triangles.length * 3);
         for(let i = 0; i < cubeModel.triangles.length; i++){
             let currTriangle = cubeModel.triangles[i];
             posArray.push(currTriangle.coordinates);
@@ -162,6 +166,47 @@ function modelCube(){
         gl.vertexAttribPointer(attributeLocation, posComponentCount, gl.FLOAT, gl.FALSE, 0, 0);
         gl.enableVertexAttribArray(attributeLocation);
 
-        
+        //pass the color buffer
+        let colorArr;
+
+        //check if the single color selection is enabled or not
+        let singleColor = document.getElementById("checkboxSingleColor").value == true;
+        if(singleColor){
+            colorArr = new Float32Array(cubeModel.triangles.length * 3);
+            for(let i = 0; i < cubeModel.triangles.length; i++){
+                colorArr[0] = FIXED_R;
+                colorArr[1] = FIXED_G;
+                colorArr[2] = FIXED_B;
+            }
+        }
+        else{
+            colorArr = new Float32Array(FRONT_R, FRONT_G, FRONT_B, BACK_R, BACK_G, BACK_B, TOP_R, TOP_G, TOP_B, BOTTOM_R, BOTTOM_G, BOTTOM_B,
+                LEFT_R, LEFT_G, LEFT_B, RIGHT_R, RIGHT_G, RIGHT_B);
+        }
+        let colorBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer); //specify that this is the current buffer in use
+        gl.bufferData(gl.ARRAY_BUFFER, colorArr, gl.STATIC_DRAW);
+
+        attributeLocation = gl.getAttribLocation(program, 'vertColor');
+        const colorCompCount = 3;
+
+        gl.vertexAttribPointer(attributeLocation, colorCompCount, gl.FLOAT, gl.FALSE, 0, 0);
+        gl.enableVertexAttribArray(attributeLocation);
+
+        const verticeCount = cubeModel.triangles.length * 3;
+
+        // Check for shader compile errors
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            console.error("Vertex Shader Error: " + gl.getShaderInfoLog(vertexShader));
+            
+        }
+        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+            console.error("Fragment Shader Error: " + gl.getShaderInfoLog(fragmentShader));
+        }
+
+        gl.useProgram(program);
+        gl.drawArrays(gl.TRIANGLE, 0, verticeCount);
     }
 }
+
+modelCube();
