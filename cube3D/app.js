@@ -21,6 +21,8 @@ const RIGHT_B = 0.4;
 const FIXED_R = 0.4;
 const FIXED_G = 0.3;
 const FIXED_B = 0.2;
+
+const CANVAS_LENGTH = 600;
 class Triangle {
     constructor(coordinates, colors) {
         this.coordinates = new Float32Array(coordinates);
@@ -33,8 +35,47 @@ class Model {
         this.triangles = triangles;
         this.scale = 1.0;
         this.translation = [0.0, 0.0, 0.0];
-        this.rotation = [0, 0, 0]; //rotation in angles
+        this.rotation = [0.0, 0.0, 0.0]; //rotation in angles
     }
+}
+
+let dragEnabled = false;
+let prevX, prevY;
+
+function mouseDown(event){
+    dragEnabled = true;
+    prevX = event.clientX;
+    prevY = event.clientY;
+}
+function mouseMove(event){
+    if(dragEnabled){
+        //calculate the rotation angle in degrees
+        //console.log("Drag event coordinates are " + event.clientX + ", " + event.clientY);
+        let x = event.clientX;
+        let y = event.clientY;
+        let dy = y - prevY;
+        let dx = x - prevX;
+
+        let rotationAngleX; //in degrees
+        let rotationAngleY;
+        /*if(dx !== 0){
+            rotationAngle = Math.atan(dy / (dx * 1.0));
+        }
+        else{
+            if(dy > 0){
+                rotationAngle = 90;
+            }
+            else{
+                rotationAngle = -90;
+            }
+        }*/
+       const rotationCoefficient = 360;
+       rotationAngleX = dx * rotationCoefficient;
+       rotationAngleY = dy * rotationCoefficient;
+    }
+}
+function mouseUp(){
+    dragEnabled = false;
 }
 
 function modelCube() {
@@ -55,12 +96,55 @@ function modelCube() {
             [0.5, 0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5],
             [FRONT_R, FRONT_G, FRONT_B, FRONT_R, FRONT_G, FRONT_B, FRONT_R, FRONT_G, FRONT_B]
         );
+         //the back face
+                let backUpper = new Triangle([0.5, 0.5, -0.5,
+                    -0.5, 0.5, -0.5,
+                    -0.5, -0.5, -0.5],
+                    [BACK_R, BACK_G, BACK_B]);
+        let backLower = new Triangle([0.5, 0.5, -0.5,
+                    0.5, -0.5, -0.5,
+                    -0.5, -0.5, -0.5],
+                    [BACK_R, BACK_G, BACK_B]);
+        //top face
+        let topUpper = new Triangle([-0.5, 0.5, 0.5,
+                    -0.5, 0.5, -0.5,
+                    0.5, 0.5, -0.5],
+                    [TOP_R, TOP_G, TOP_B]);
+        let topLower = new Triangle([-0.5, 0.5, 0.5,
+                    0.5, 0.5, 0.5,
+                    0.5, 0.5, -0.5], 
+                    [TOP_R, TOP_G, TOP_B]);
+        //bottom face
+        let bottomUpper = new Triangle([-0.5, -0.5, 0.5,
+                    -0.5, -0.5, -0.5,
+                    0.5, -0.5, -0.5],
+                    [BOTTOM_R, BOTTOM_G, BOTTOM_B]);
+        let bottomLower = new Triangle([-0.5, -0.5, 0.5,
+                    0.5, -0.5, 0.5,
+                    0.5, -0.5, -0.5],
+                    [BOTTOM_R, BOTTOM_G, BOTTOM_B]);
+        //left face
+        let leftUpper = new Triangle([-0.5, 0.5, -0.5,
+                    -0.5, 0.5, 0.5,
+                    -0.5, -0.5, 0.5],
+                    [LEFT_R, LEFT_G, LEFT_B]);
+        let leftLower = new Triangle([-0.5, -0.5, -0.5, 
+                    -0.5, 0.5, 0.5,
+                    -0.5, -0.5, 0.5],
+                [LEFT_R, LEFT_G, LEFT_B]);
+        //right face
+        let rightUpper = new Triangle([0.5, 0.5, -0.5,
+                    0.5, 0.5, 0.5,
+                    0.5, -0.5, 0.5],
+                    [RIGHT_R, RIGHT_G, RIGHT_B]);
+        let rightLower = new Triangle([0.5, -0.5, -0.5, 
+                    0.5, 0.5, 0.5,
+                    0.5, -0.5, 0.5],
+                    [RIGHT_R, RIGHT_G, RIGHT_B]);
 
-        // Define other faces similarly...
 
         let cubeModel = new Model([
-            frontUpper, frontLower
-            // Add other faces here...
+            frontUpper, frontLower, backUpper, backLower, topUpper, topLower, bottomUpper, bottomLower, leftUpper, leftLower, rightUpper, rightLower
         ]);
 
         const shaders = {
@@ -102,13 +186,13 @@ function modelCube() {
         gl.linkProgram(program);
 
         // Check for shader compile errors
-        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)){
             console.error("Vertex Shader Error: " + gl.getShaderInfoLog(vertexShader));
         }
-        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+        if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
             console.error("Fragment Shader Error: " + gl.getShaderInfoLog(fragmentShader));
         }
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        if(!gl.getProgramParameter(program, gl.LINK_STATUS)){
             console.error("Shader Program Error: " + gl.getProgramInfoLog(program));
         }
 
@@ -116,7 +200,7 @@ function modelCube() {
 
         // Pass the pos buffer
         let posArray = new Float32Array(cubeModel.triangles.length * 9); // 9 = 3 vertices * 3 components (x, y, z)
-        for (let i = 0; i < cubeModel.triangles.length; i++) {
+        for(let i = 0; i < cubeModel.triangles.length; i++){
             posArray.set(cubeModel.triangles[i].coordinates, i * 9);
         }
 
@@ -134,12 +218,13 @@ function modelCube() {
         let colorArr;
         let singleColor = document.getElementById("checkboxSingleColor").checked;
 
-        if (singleColor) {
+        if(singleColor){
             colorArr = new Float32Array(cubeModel.triangles.length * 9);
             for (let i = 0; i < cubeModel.triangles.length * 3; i++) {
                 colorArr.set([FIXED_R, FIXED_G, FIXED_B], i * 3);
             }
-        } else {
+        } 
+        else{
             colorArr = new Float32Array(cubeModel.triangles.length * 9);
             for (let i = 0; i < cubeModel.triangles.length; i++) {
                 colorArr.set(cubeModel.triangles[i].colors, i * 9);
