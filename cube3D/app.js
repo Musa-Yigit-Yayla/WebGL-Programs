@@ -264,8 +264,8 @@ function modelCube() {
         const rotateXLocation = gl.getUniformLocation(program, 'rotateX');
         const rotateYLocation = gl.getUniformLocation(program, 'rotateY');
 
-        gl.uniform1f(rotateXLocation, cubeModel.rotation[0]);
-        gl.uniform1f(rotateYLocation, cubeModel.rotation[1]);
+        gl.uniform1f(rotateXLocation, cubeModel.rotation[1]);
+        gl.uniform1f(rotateYLocation, cubeModel.rotation[0]);
 
         gl.drawArrays(gl.TRIANGLES, 0, posArray.length / 3);
     }
