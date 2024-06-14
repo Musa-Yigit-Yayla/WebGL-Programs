@@ -75,7 +75,7 @@ function mouseMove(event){
                 rotationAngle = -90;
             }
         }*/
-       const rotationCoefficient = 1 / 300.0;
+       const rotationCoefficient = 1 / 100.0;
        rotationAngleX = dx * rotationCoefficient;
        rotationAngleY = dy * rotationCoefficient;
        console.log("Rotation angles yield respectively: " + rotationAngleX + ", " + rotationAngleY);
@@ -173,38 +173,30 @@ function modelCube() {
                 in vec3 vertPos;
                 in vec3 vertColor;
                 out vec3 fragColor;
-                in float rotateX; //in degrees angle
-                in float rotateY; //in degrees angle
-                vec3 a_rotatedPos;
-    
-                void main(){
-                    const float cubeLength = 1.0;
+                uniform float rotateX; // in degrees
+                uniform float rotateY; // in degrees
+
+                void main() {
                     float radX = radians(rotateX);
                     float radY = radians(rotateY);
-                    
-                    
-                    if(vertPos.x < 0.0){
-                        //we will increment the overall x hence multiply by positive
-                        a_rotatedPos.x = vertPos.x * cos(radX); //double check the angles
-                        a_rotatedPos.z = vertPos.z * sin(radX); //z should change positive proportionate 
-                    }
-                    else{
-                        a_rotatedPos.x = vertPos.x * cos(radX) * -1.0;
-                        a_rotatedPos.z = vertPos.z * sin(radX) * -1.0; 
-                    }
-                    //similar procude for y coordinates
-                    if(vertPos.y < 0.0){
-                        a_rotatedPos.y = vertPos.y * sin(radY); //check the angles
-                        a_rotatedPos.z = vertPos.z * cos(radY); 
-                    }
-                    else{
-                        a_rotatedPos.y = vertPos.y * sin(radY) * -1.0;
-                        a_rotatedPos.z = vertPos.z * cos(radX) * -1.0; 
-                    }
 
-                    
+                    mat4 rotX = mat4(
+                        1.0, 0.0, 0.0, 0.0,
+                        0.0, cos(radX), -sin(radX), 0.0,
+                        0.0, sin(radX), cos(radX), 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    );
+
+                    mat4 rotY = mat4(
+                        cos(radY), 0.0, sin(radY), 0.0,
+                        0.0, 1.0, 0.0, 0.0,
+                        -sin(radY), 0.0, cos(radY), 0.0,
+                        0.0, 0.0, 0.0, 1.0
+                    );
+
+                    vec4 rotatedPos = rotY * rotX * vec4(vertPos, 1.0);
                     fragColor = vertColor;
-                    gl_Position = vec4(vertPos, 1.0);
+                    gl_Position = rotatedPos;
                 }`,
             fs: `#version 300 es
                 precision mediump float;
@@ -216,40 +208,35 @@ function modelCube() {
                 }`
         };
 
-        // Create shaders
         let vertexShader = gl.createShader(gl.VERTEX_SHADER);
         let fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 
         gl.shaderSource(vertexShader, shaders.vs);
         gl.shaderSource(fragmentShader, shaders.fs);
 
-        // Compile shaders
         gl.compileShader(vertexShader);
         gl.compileShader(fragmentShader);
 
-        // Create program
-        let program = gl.createProgram();
+        if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            console.error("Vertex Shader Error: " + gl.getShaderInfoLog(vertexShader));
+        }
+        if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+            console.error("Fragment Shader Error: " + gl.getShaderInfoLog(fragmentShader));
+        }
 
+        let program = gl.createProgram();
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
 
-        // Check for shader compile errors
-        if(!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)){
-            console.error("Vertex Shader Error: " + gl.getShaderInfoLog(vertexShader));
-        }
-        if(!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)){
-            console.error("Fragment Shader Error: " + gl.getShaderInfoLog(fragmentShader));
-        }
-        if(!gl.getProgramParameter(program, gl.LINK_STATUS)){
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error("Shader Program Error: " + gl.getProgramInfoLog(program));
         }
 
         gl.useProgram(program);
 
-        // Pass the pos buffer
-        let posArray = new Float32Array(cubeModel.triangles.length * 9); // 9 = 3 vertices * 3 components (x, y, z)
-        for(let i = 0; i < cubeModel.triangles.length; i++){
+        let posArray = new Float32Array(cubeModel.triangles.length * 9);
+        for (let i = 0; i < cubeModel.triangles.length; i++) {
             posArray.set(cubeModel.triangles[i].coordinates, i * 9);
         }
 
@@ -257,65 +244,30 @@ function modelCube() {
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, posArray, gl.STATIC_DRAW);
 
-        let attributeLocation = gl.getAttribLocation(program, 'vertPos');
-        const posComponentCount = 3;
+        let posLocation = gl.getAttribLocation(program, 'vertPos');
+        gl.vertexAttribPointer(posLocation, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(posLocation);
 
-        gl.vertexAttribPointer(attributeLocation, posComponentCount, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(attributeLocation);
-
-        // Pass the color buffer
-        let colorArr;
-        let singleColor = document.getElementById("checkboxSingleColor").checked;
-
-        if(singleColor){
-            colorArr = new Float32Array(cubeModel.triangles.length * 9);
-            for (let i = 0; i < cubeModel.triangles.length * 3; i++) {
-                colorArr.set([FIXED_R, FIXED_G, FIXED_B], i * 3);
-            }
-        } 
-        else{
-            colorArr = new Float32Array(cubeModel.triangles.length * 9);
-            for (let i = 0; i < cubeModel.triangles.length; i++) {
-                colorArr.set(cubeModel.triangles[i].colors, i * 9);
-            }
+        let colorArray = new Float32Array(cubeModel.triangles.length * 9);
+        for (let i = 0; i < cubeModel.triangles.length; i++) {
+            colorArray.set(cubeModel.triangles[i].colors, i * 9);
         }
 
         let colorBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, colorArr, gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, colorArray, gl.STATIC_DRAW);
 
-        attributeLocation = gl.getAttribLocation(program, 'vertColor');
-        const colorCompCount = 3;
+        let colorLocation = gl.getAttribLocation(program, 'vertColor');
+        gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(colorLocation);
 
-        gl.vertexAttribPointer(attributeLocation, colorCompCount, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(attributeLocation);
+        const rotateXLocation = gl.getUniformLocation(program, 'rotateX');
+        const rotateYLocation = gl.getUniformLocation(program, 'rotateY');
 
-        const verticeCount = posArray.length / 3;
+        gl.uniform1f(rotateXLocation, cubeModel.rotation[0]);
+        gl.uniform1f(rotateYLocation, cubeModel.rotation[1]);
 
-        //pass the rotation angles
-        let rotateArray = new Float32Array([cubeModel.rotation[0], cubeModel.rotation[1]]);
-
-        console.log("Rotate array:" + rotateArray.toString());
-        console.log("model function scope cubeModel.rotations yield " + cubeModel.rotation.toString());
-
-        let xBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, xBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, rotateArray, gl.STATIC_DRAW);
-
-        let rotateXLocation = gl.getAttribLocation(program, 'rotateX');
-        gl.vertexAttribPointer(rotateXLocation, 1, gl.FLOAT, false, 0, 0);
-        gl.enableVertexAttribArray(rotateXLocation);
-
-        let yBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, yBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, rotateArray, gl.STATIC_DRAW);
-
-        let rotateYLocation = gl.getAttribLocation(program, 'rotateY');
-        gl.vertexAttribPointer(rotateYLocation, 1, gl.FLOAT, false, 0, 4); //offset must be a multiple of 4 (1 32 bit number)
-        gl.enableVertexAttribArray(rotateYLocation);
-        
-        // Draw the triangles
-        gl.drawArrays(gl.TRIANGLES, 0, verticeCount);
+        gl.drawArrays(gl.TRIANGLES, 0, posArray.length / 3);
     }
 }
 
