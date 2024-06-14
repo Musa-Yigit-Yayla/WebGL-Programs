@@ -41,6 +41,9 @@ class Model {
 
 let dragEnabled = false;
 let prevX, prevY;
+let totalRotateX = 0.0, totalRotateY= 0.0; //total rotation angles
+
+let cubeModel; //Model object
 
 function mouseDown(event){
     dragEnabled = true;
@@ -69,9 +72,18 @@ function mouseMove(event){
                 rotationAngle = -90;
             }
         }*/
-       const rotationCoefficient = 360;
+       const rotationCoefficient = 360.0;
        rotationAngleX = dx * rotationCoefficient;
        rotationAngleY = dy * rotationCoefficient;
+       totalRotateX += rotationAngleX;
+       totalRotateY += rotationAngleY;
+       totalRotateX %= 360.0;
+       totalRotateY %= 360.0;
+       cubeModel.rotation[0] = totalRotateX;
+       cubeModel.rotation[1] = totalRotateY;
+
+       //rerender the cube model
+       modelCube();
     }
 }
 function mouseUp(){
@@ -84,7 +96,7 @@ function modelCube() {
     console.log("gl yields: " + gl);
     if (gl) {
         console.log("FREEMAN");
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clearColor(1.0, 1.0, 1.0, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
         // Define the triangles for each face of the cube
@@ -97,7 +109,7 @@ function modelCube() {
             [FRONT_R, FRONT_G, FRONT_B, FRONT_R, FRONT_G, FRONT_B, FRONT_R, FRONT_G, FRONT_B]
         );
          //the back face
-                let backUpper = new Triangle([0.5, 0.5, -0.5,
+        let backUpper = new Triangle([0.5, 0.5, -0.5,
                     -0.5, 0.5, -0.5,
                     -0.5, -0.5, -0.5],
                     [BACK_R, BACK_G, BACK_B]);
@@ -143,7 +155,7 @@ function modelCube() {
                     [RIGHT_R, RIGHT_G, RIGHT_B]);
 
 
-        let cubeModel = new Model([
+        cubeModel = new Model([
             frontUpper, frontLower, backUpper, backLower, topUpper, topLower, bottomUpper, bottomLower, leftUpper, leftLower, rightUpper, rightLower
         ]);
 
@@ -152,8 +164,36 @@ function modelCube() {
                 in vec3 vertPos;
                 in vec3 vertColor;
                 out vec3 fragColor;
-
+                in float rotateX; //in degrees angle
+                in float rotateY; //in degrees angle
+                attribute vec3 a_rotatedPos;
+    
                 void main(){
+                    const float cubeLength = 1.0;
+                    float radX = radians(rotateX);
+                    float radY = radians(rotateY);
+                    
+                    
+                    if(vertPos.x < 0){
+                        //we will increment the overall x hence multiply by positive
+                        a_rotatedPos.x = vertPos.x * cos(radX); //double check the angles
+                        a_rotatedPos.z = vertPos.z * sin(radX); //z should change positive proportionate 
+                    }
+                    else{
+                        a_rotatedPos.x = vertPos.x * cos(radX) * -1.0;
+                        a_rotatedPos.z = vertPos.z * sin(radX) * -1.0; 
+                    }
+                    //similar procude for y coordinates
+                    if(vertPos.y < 0){
+                        a_rotatedPos.y = vertPos.y * sin(radY); //check the angles
+                        a_rotatedPos.z = vertPos.z * cos(radY); 
+                    }
+                    else{
+                        a_rotatedPos.y = vertPos.y * sin(radY) * -1.0;
+                        a_rotatedPos.z = vertPos.z * cos(radX) * -1.0; 
+                    }
+
+                    
                     fragColor = vertColor;
                     gl_Position = vec4(vertPos, 1.0);
                 }`,
@@ -243,6 +283,24 @@ function modelCube() {
 
         const verticeCount = posArray.length / 3;
 
+        //pass the rotation angles
+        let rotateArray = new Float32Array([cubeModel.rotation[0], cubeModel.rotation[1]]);
+        let xBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, xBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, rotateArray, gl.STATIC_DRAW);
+
+        let rotateXLocation = gl.getAttribLocation(program, 'rotateX');
+        gl.vertexAttribPointer(rotateXLocation, 1, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(rotateXLocation);
+
+        let yBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, yBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, rotateArray, gl.STATIC_DRAW);
+
+        let rotateYLocation = gl.getAttribLocation(program, 'rotateY');
+        gl.vertexAttribPointer(rotateYLocation, 1, gl.FLOAT, false, 0, 1);
+        gl.enableVertexAttribArray(rotateYLocation);
+        
         // Draw the triangles
         gl.drawArrays(gl.TRIANGLES, 0, verticeCount);
     }
