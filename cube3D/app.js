@@ -166,7 +166,7 @@ function modelCube() {
                 out vec3 fragColor;
                 in float rotateX; //in degrees angle
                 in float rotateY; //in degrees angle
-                attribute vec3 a_rotatedPos;
+                vec3 a_rotatedPos;
     
                 void main(){
                     const float cubeLength = 1.0;
@@ -174,7 +174,7 @@ function modelCube() {
                     float radY = radians(rotateY);
                     
                     
-                    if(vertPos.x < 0){
+                    if(vertPos.x < 0.0){
                         //we will increment the overall x hence multiply by positive
                         a_rotatedPos.x = vertPos.x * cos(radX); //double check the angles
                         a_rotatedPos.z = vertPos.z * sin(radX); //z should change positive proportionate 
@@ -184,7 +184,7 @@ function modelCube() {
                         a_rotatedPos.z = vertPos.z * sin(radX) * -1.0; 
                     }
                     //similar procude for y coordinates
-                    if(vertPos.y < 0){
+                    if(vertPos.y < 0.0){
                         a_rotatedPos.y = vertPos.y * sin(radY); //check the angles
                         a_rotatedPos.z = vertPos.z * cos(radY); 
                     }
@@ -298,7 +298,7 @@ function modelCube() {
         gl.bufferData(gl.ARRAY_BUFFER, rotateArray, gl.STATIC_DRAW);
 
         let rotateYLocation = gl.getAttribLocation(program, 'rotateY');
-        gl.vertexAttribPointer(rotateYLocation, 1, gl.FLOAT, false, 0, 1);
+        gl.vertexAttribPointer(rotateYLocation, 1, gl.FLOAT, false, 0, 4); //offset must be a multiple of 4 (1 32 bit number)
         gl.enableVertexAttribArray(rotateYLocation);
         
         // Draw the triangles
