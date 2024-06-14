@@ -44,6 +44,7 @@ let prevX, prevY;
 let totalRotateX = 0.0, totalRotateY= 0.0; //total rotation angles
 
 let cubeModel; //Model object
+let modelInvoked = false; //model function initial call made status
 
 function mouseDown(event){
     dragEnabled = true;
@@ -59,6 +60,8 @@ function mouseMove(event){
         let dy = y - prevY;
         let dx = x - prevX;
 
+        console.log("dx and dy yield " + dx + ", " + dy);
+
         let rotationAngleX; //in degrees
         let rotationAngleY;
         /*if(dx !== 0){
@@ -72,9 +75,10 @@ function mouseMove(event){
                 rotationAngle = -90;
             }
         }*/
-       const rotationCoefficient = 360.0;
+       const rotationCoefficient = 1 / 300.0;
        rotationAngleX = dx * rotationCoefficient;
        rotationAngleY = dy * rotationCoefficient;
+       console.log("Rotation angles yield respectively: " + rotationAngleX + ", " + rotationAngleY);
        totalRotateX += rotationAngleX;
        totalRotateY += rotationAngleY;
        totalRotateX %= 360.0;
@@ -82,6 +86,9 @@ function mouseMove(event){
        cubeModel.rotation[0] = totalRotateX;
        cubeModel.rotation[1] = totalRotateY;
 
+       console.log("totalRotateX/Y values yield " + totalRotateX + ", " + totalRotateY);
+
+       console.log("cubeModel.rotation yields: " + cubeModel.rotation.toString());
        //rerender the cube model
        modelCube();
     }
@@ -93,9 +100,9 @@ function mouseUp(){
 function modelCube() {
     let canvas = document.getElementById("canvas");
     let gl = canvas.getContext('webgl2');
-    console.log("gl yields: " + gl);
+    //console.log("gl yields: " + gl);
     if (gl) {
-        console.log("FREEMAN");
+        //console.log("FREEMAN");
         gl.clearColor(1.0, 1.0, 1.0, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -154,10 +161,12 @@ function modelCube() {
                     0.5, -0.5, 0.5],
                     [RIGHT_R, RIGHT_G, RIGHT_B]);
 
-
-        cubeModel = new Model([
-            frontUpper, frontLower, backUpper, backLower, topUpper, topLower, bottomUpper, bottomLower, leftUpper, leftLower, rightUpper, rightLower
-        ]);
+        if(!modelInvoked){
+            cubeModel = new Model([
+                frontUpper, frontLower, backUpper, backLower, topUpper, topLower, bottomUpper, bottomLower, leftUpper, leftLower, rightUpper, rightLower
+            ]);
+            modelInvoked = true;
+        }
 
         const shaders = {
             vs: `#version 300 es
@@ -285,6 +294,10 @@ function modelCube() {
 
         //pass the rotation angles
         let rotateArray = new Float32Array([cubeModel.rotation[0], cubeModel.rotation[1]]);
+
+        console.log("Rotate array:" + rotateArray.toString());
+        console.log("model function scope cubeModel.rotations yield " + cubeModel.rotation.toString());
+
         let xBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, xBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, rotateArray, gl.STATIC_DRAW);
