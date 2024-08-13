@@ -1,8 +1,8 @@
-console.log(math);
 
 
 
 let gl = document.getElementById('canvas').getContext('webgl2');
+
 const shaders = {
     vs: 
     `#version 300 es
@@ -15,7 +15,10 @@ const shaders = {
     in vec2 rotation;
 
     void main(){
-        gl_Position = vec4(vertices, 1.0);
+        float relativeX = vertices[0] - cameraPos[0];
+        float relativeY = vertices[1] - cameraPos[1];
+        float relativeZ = vertices[2] - cameraPos[2];
+        gl_Position = vec4(relativeX, relativeY, relativeZ, 1.0);
         fragColor = vertColor;
     }
 
@@ -39,9 +42,9 @@ let colorBuffer;
 const CIRCLE_PRECISION = 240;
 
 const initialPos = {
-    x: 0.0,
-    y: 0.0,
-    z: 0.8
+    x: -0.4,
+    y: 0.2,
+    z: 1.0
 }
 
 const cameraPos = {
@@ -105,8 +108,8 @@ function getCylinder(cx0, cy0, cz0, cx1, cy1, cz1, radius){
 
     const a = 360.0 / CIRCLE_PRECISION;
     for(let i = 0; i < CIRCLE_PRECISION; i++){
-        currX += Math.sin(a * i);
-        currY -= Math.cos(a * i);
+        currX += Math.sin(a * i) * radius;
+        currY -= Math.cos(a * i) * radius;
 
         circleVert0.push([currX, currY, 0.0]);
         circleVert1.push([currX, currY, distance]);
@@ -128,58 +131,54 @@ function renderFrame(){
 
     //render the main pole
     
-    renderCylinder(mainPole[0], mainPole[1], 0, 0, 0, [0.0, 0.0, 0.0]);
+    renderCylinder(mainPole[0], mainPole[1], 0, 0, 0, [0.1, 0.4, 0.0]);
     
     requestAnimationFrame(renderFrame);
 }
 
 //color is expected to be an array with 3 entries, rgb respectively
-function renderCylinder( circleVert0, circleVert1, rotX, rotY, rotZ , color){
-    console.log("Debug: renderCylinder invoked");
+function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
+    console.log("Debug: renderCylinder invoked with color:", color);
 
-
-    let vertices0 = new Float32Array(circleVert0);
-    let vertices1 = new Float32Array(circleVert1);
-    
+    // Combine vertices
+    let vertices0 = new Float32Array(circleVert0.flat());
+    let vertices1 = new Float32Array(circleVert1.flat());
     let vertices = new Float32Array(vertices0.length + vertices1.length);
-    for(let i = 0; i < vertices.length; i++){
-        if(i < vertices0.length){
-            vertices[i] = vertices0[i];
-        }
-        else{
-            vertices[i] = vertices1[i - vertices0.length];
-        }
-    }
+    vertices.set(vertices0);
+    vertices.set(vertices1, vertices0.length);
 
+    // Set up color data
     let colorArr = new Float32Array(color);
-    let cameraArr = new Float32Array([cameraPos.x, cameraPos.y, cameraPos.z]);
-    
-    let wallVertices = new Float32Array(circleVert0.length * 3); //hold first two vertices from c0, then first vertex of c1, 
-    //then hold first two from c0 and second from c1, and then the second pair from c0 and second from c1, and then second pair from c0 and thrid from c1 and so on
-
-    let it = 0; //iterator for wallVertices
-    for(let i = 0; i < vertices0.length; i += 2){
-        for(let j = 0; j < 2; j++){
-            wallVertices[it++] = vertices0[i];
-            wallVertices[it++] = vertices0[i + 1];
-            wallVertices[it++] = vertices1[j];
-        }
-    }
-    
-    let verticesLoc = gl.getAttribLocation(program, 'vertices');
 
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-    
-    gl.vertexAttribPointer(verticesLoc, 3, gl.FLOAT, gl.FALSE, 0, 0);
 
-    let vertColorLoc = gl.getAttribLocation(program, 'vertColor');
+    let verticesLoc = gl.getAttribLocation(program, 'vertices');
+    gl.enableVertexAttribArray(verticesLoc);
+    gl.vertexAttribPointer(verticesLoc, 3, gl.FLOAT, false, 0, 0);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, colorArr, gl.STATIC_DRAW);
-    gl.vertexAttribPointer(vertColorLoc, 3, gl.FLOAT, gl.FALSE, 0, 0);
 
+    let vertColorLoc = gl.getAttribLocation(program, 'vertColor');
+    gl.enableVertexAttribArray(vertColorLoc);
+    gl.vertexAttribPointer(vertColorLoc, 3, gl.FLOAT, false, 0, 0);
+
+    let cameraPosArr = new Float32Array([cameraPos.x, cameraPos.y, cameraPos.z]);
+    let cameraPosLoc = gl.getUniformLocation(program, 'cameraPos');
+    gl.uniform3fv(cameraPosLoc, cameraPosArr);
+
+    // Clear the canvas
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    // Draw the cylinder
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertices.length / 3);
+
+    // Check for WebGL errors
+    let error = gl.getError();
+    if (error !== gl.NO_ERROR) {
+        console.error('WebGL Error:', error);
+    }
 }
 
 /**
@@ -238,9 +237,23 @@ function initProgram(){
     gl.compileShader(vertexShader);
     gl.compileShader(fragShader);
 
+    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+        console.error('Vertex Shader Compile Error:', gl.getShaderInfoLog(vertexShader));
+        return;
+    }
+    if (!gl.getShaderParameter(fragShader, gl.COMPILE_STATUS)) {
+        console.error('Fragment Shader Compile Error:', gl.getShaderInfoLog(fragShader));
+        return;
+    }
+
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragShader);
     gl.linkProgram(program);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        const infoLog = gl.getProgramInfoLog(program);
+        console.error('WebGL Program Link Error: ', infoLog);
+    }
     gl.useProgram(program);
 
     vertexBuffer = gl.createBuffer();
