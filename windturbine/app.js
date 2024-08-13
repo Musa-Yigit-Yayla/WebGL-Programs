@@ -1,5 +1,5 @@
 
-
+const SPEED = 0.04;
 
 let gl = document.getElementById('canvas').getContext('webgl2');
 
@@ -12,13 +12,31 @@ const shaders = {
     uniform vec3 cameraPos;
     out vec3 fragColor;
 
-    in vec2 rotation;
+    uniform vec2 rotation; //expected to be in radians
 
     void main(){
-        float relativeX = vertices[0] - cameraPos[0];
-        float relativeY = vertices[1] - cameraPos[1];
         float relativeZ = vertices[2] - cameraPos[2];
-        gl_Position = vec4(relativeX, relativeY, relativeZ, 1.0);
+        float relativeX = (vertices[0] - cameraPos[0]) / (relativeZ);
+        float relativeY = (vertices[1] - cameraPos[1]) / (relativeZ); //divide x and y by z to obtain close-far perspective
+        
+        float radX = rotation[0];
+        float radY = rotation[1];
+
+        mat4 rotX = mat4(
+            1.0, 0.0, 0.0, 0.0,
+            0.0, cos(radX), -sin(radX), 0.0,
+            0.0, sin(radX), cos(radX), 0.0,
+            0.0, 0.0, 0.0, 1.0
+        ); //rotation matrix around x axis
+
+        mat4 rotY = mat4(
+            cos(radY), 0.0, sin(radY), 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            -sin(radY), 0.0, cos(radY), 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+
+        gl_Position = rotY * rotX * vec4(relativeX, relativeY, relativeZ, 1.0);
         fragColor = vertColor;
     }
 
@@ -42,9 +60,9 @@ let colorBuffer;
 const CIRCLE_PRECISION = 240;
 
 const initialPos = {
-    x: -0.4,
+    x: 0.0,
     y: 0.2,
-    z: 1.0
+    z: 0.3
 }
 
 const cameraPos = {
@@ -168,6 +186,13 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     let cameraPosLoc = gl.getUniformLocation(program, 'cameraPos');
     gl.uniform3fv(cameraPosLoc, cameraPosArr);
 
+    let toRad = function(degree){
+        return degree * Math.PI / 180.0;
+    }
+    let rotationArr = new Float32Array([toRad(rotation.rotX), toRad(rotation.rotY)]);
+    let rotationLoc = gl.getUniformLocation(program, 'rotation');
+    gl.uniform2fv(rotationLoc, rotationArr);
+
     // Clear the canvas
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
@@ -260,6 +285,14 @@ function initProgram(){
     colorBuffer = gl.createBuffer();
 }
 
+//call upon keystroke
+function setKeyEvents(){
+    window.onkeydown = function(e){
+
+    }
+}
+
+setKeyEvents();
 initProgram();
 renderFrame();
 
