@@ -144,6 +144,10 @@ function getCylinder(cx0, cy0, cz0, cx1, cy1, cz1, radius){
     return [circleVert0, circleVert1];
 }
 
+let toRad = function(degree){
+    return degree * Math.PI / 180.0;
+};
+
 function renderFrame(){
     console.log("Debug: renderFrame invoked");
 
@@ -186,9 +190,7 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     let cameraPosLoc = gl.getUniformLocation(program, 'cameraPos');
     gl.uniform3fv(cameraPosLoc, cameraPosArr);
 
-    let toRad = function(degree){
-        return degree * Math.PI / 180.0;
-    }
+    
     let rotationArr = new Float32Array([toRad(rotation.rotX), toRad(rotation.rotY)]);
     let rotationLoc = gl.getUniformLocation(program, 'rotation');
     gl.uniform2fv(rotationLoc, rotationArr);
@@ -287,8 +289,26 @@ function initProgram(){
 
 //call upon keystroke
 function setKeyEvents(){
+    //update camera pos with respect to current set rotations
     window.onkeydown = function(e){
-
+        const key = (e.key).toString().toLowerCase();
+        console.log(key);
+        if(key === 'w'){
+            console.log("Debug: move front");
+            cameraPos.x += Math.sin(toRad(rotation.rotY)) * SPEED;
+            cameraPos.y += Math.sin(toRad(rotation.rotX)) * SPEED;
+            cameraPos.z += (-1 + Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED;
+        }
+        else if(key === "s"){
+            cameraPos.x -= Math.sin(toRad(rotation.rotY)) * SPEED;
+            cameraPos.y -= Math.sin(toRad(rotation.rotX)) * SPEED;
+            cameraPos.z -= (-1 + Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED;
+        }
+        else if(key === "a"){
+            cameraPos.x += (-1 + Math.sin(toRad(rotation.rotY))) * SPEED;
+            cameraPos.y = Math.sin(toRad(rotation.rotX)) * SPEED;
+            cameraPos.z = (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED;
+        }
     }
 }
 
