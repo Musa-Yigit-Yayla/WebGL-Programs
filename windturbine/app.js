@@ -1,5 +1,10 @@
 
 const SPEED = 0.04;
+const SENSITIVITY = 0.13;
+const FOV = 90;
+
+const CANVAS_WIDTH = document.getElementById('canvas').clientWidth;
+const CANVAS_HEIGHT = document.getElementById('canvas').clientHeight;
 
 let gl = document.getElementById('canvas').getContext('webgl2');
 
@@ -10,6 +15,8 @@ const shaders = {
     in vec3 vertices;
     in vec3 vertColor;
     uniform vec3 cameraPos;
+    uniform mat4 viewMatrix;
+    uniform mat4 projectionMatrix;
     out vec3 fragColor;
 
     uniform vec2 rotation; //expected to be in radians
@@ -36,7 +43,8 @@ const shaders = {
             0.0, 0.0, 0.0, 1.0
         );
 
-        gl_Position = rotY * rotX * vec4(relativeX, relativeY, relativeZ, 1.0);
+        //gl_Position = rotY * rotX * vec4(relativeX, relativeY, relativeZ, 1.0);
+        gl_Position = projectionMatrix * viewMatrix * vec4(relativeX, relativeY, relativeZ, 1.0);
         fragColor = vertColor;
     }
 
@@ -77,6 +85,10 @@ const rotation = {
     rotY: 0.0
 }; 
 
+const mousePos = { //will be used to determine viewing via mouse rotation
+    x: CANVAS_WIDTH,
+    y: CANVAS_HEIGHT
+};
 
 const mainPole = getCylinder(
     0.0, 0.8, 0.0, //top
@@ -142,7 +154,7 @@ function getCylinder(cx0, cy0, cz0, cx1, cy1, cz1, radius){
     circleVert1 = rotateVertices(circleVert1, tarX, tarY, tarZ);
 
     return [circleVert0, circleVert1];
-}
+};
 
 let toRad = function(degree){
     return degree * Math.PI / 180.0;
@@ -156,6 +168,45 @@ function renderFrame(){
     renderCylinder(mainPole[0], mainPole[1], 0, 0, 0, [0.1, 0.4, 0.0]);
     
     requestAnimationFrame(renderFrame);
+}
+
+// View Matrix: Positions the camera
+function getViewMatrix(cameraPosArr, pitch, yaw) {
+
+
+    let front = [
+        Math.cos(yaw) * Math.cos(pitch),
+        Math.sin(pitch),
+        Math.sin(yaw) * Math.cos(pitch)
+    ];
+
+    let right = math.cross([0, 1, 0], front);
+    let up = math.cross(front, right);
+
+    // View matrix construction
+    let viewMatrix = [
+        right[0], right[1], right[2], -math.dot(right, cameraPosArr),
+        up[0], up[1], up[2], -math.dot(up, cameraPosArr),
+        front[0], front[1], front[2], -math.dot(front, cameraPosArr),
+        0, 0, 0, 1
+    ];
+
+    return new Float32Array(viewMatrix);
+}
+
+// Projection Matrix: Defines the view frustum
+function getProjectionMatrix(fov, aspect, near, far) {
+    let f = 1.0 / Math.tan(fov / 2);
+    let rangeInv = 1.0 / (near - far);
+
+    let projectionMatrix = [
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (near + far) * rangeInv, -1,
+        0, 0, 2 * near * far * rangeInv, 0
+    ];
+
+    return new Float32Array(projectionMatrix);
 }
 
 //color is expected to be an array with 3 entries, rgb respectively
@@ -186,10 +237,18 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     gl.enableVertexAttribArray(vertColorLoc);
     gl.vertexAttribPointer(vertColorLoc, 3, gl.FLOAT, false, 0, 0);
 
-    let cameraPosArr = new Float32Array([cameraPos.x, cameraPos.y, cameraPos.z]);
+    let cameraPosArrNormal = [cameraPos.x, cameraPos.y, cameraPos.z]
+    let cameraPosArr = new Float32Array(cameraPosArrNormal);
     let cameraPosLoc = gl.getUniformLocation(program, 'cameraPos');
     gl.uniform3fv(cameraPosLoc, cameraPosArr);
 
+    let viewMatrixLoc = gl.getUniformLocation(program, 'viewMatrix');
+    let viewMatrix = getViewMatrix(cameraPosArrNormal, rotation.rotX, rotation.rotY);
+    gl.uniformMatrix4fv(viewMatrixLoc, false, viewMatrix);
+
+    let projectionMatrixLoc = gl.getUniformLocation(program, 'projectionMatrix');
+    let projectionMatrix = getProjectionMatrix(FOV, (CANVAS_WIDTH) / (CANVAS_HEIGHT * 1.0), 1, 10);
+    gl.uniformMatrix4fv(projectionMatrixLoc, false, projectionMatrix);
     
     let rotationArr = new Float32Array([toRad(rotation.rotX), toRad(rotation.rotY)]);
     let rotationLoc = gl.getUniformLocation(program, 'rotation');
@@ -287,10 +346,9 @@ function initProgram(){
     colorBuffer = gl.createBuffer();
 }
 
-//call upon keystroke
-function setKeyEvents(){
+function setEvents(){
     //update camera pos with respect to current set rotations
-    window.onkeydown = function(e){
+    window.onkeydown = function(e){ //call upon keystroke
         const key = (e.key).toString().toLowerCase();
         console.log(key);
         if(key === 'w'){
@@ -307,12 +365,27 @@ function setKeyEvents(){
         else if(key === "a"){
             cameraPos.x += (-1 + Math.sin(toRad(rotation.rotY))) * SPEED;
             cameraPos.y = Math.sin(toRad(rotation.rotX)) * SPEED;
-            cameraPos.z = (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED;
+            cameraPos.z = (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED; //FIX HERE
         }
+    }
+    window.onmousemove = function(e){
+        let dx = mousePos.x - e.x;
+        let dy = mousePos.y - e.y;
+
+        let rotAngleX = (dx * 180.0) / (CANVAS_WIDTH);
+        let rotAngleY = (dy * 180.0) / (CANVAS_HEIGHT);
+
+        //add the new angles into existing angle attributes
+        rotation.rotX += rotAngleX;
+        rotation.rotY += rotAngleY;
+
+        //set current client positions as the new mousePos attributes
+        mousePos.x = e.x;
+        mousePos.y = e.y;
     }
 }
 
-setKeyEvents();
+setEvents();
 initProgram();
 renderFrame();
 
