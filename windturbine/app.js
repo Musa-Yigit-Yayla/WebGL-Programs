@@ -1,6 +1,6 @@
 
 const SPEED = 0.04;
-const SENSITIVITY = 0.13;
+const SENSITIVITY = 0.13 * 0.3;
 const FOV = 90;
 
 const CANVAS_WIDTH = document.getElementById('canvas').clientWidth;
@@ -247,7 +247,7 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     gl.uniformMatrix4fv(viewMatrixLoc, false, viewMatrix);
 
     let projectionMatrixLoc = gl.getUniformLocation(program, 'projectionMatrix');
-    let projectionMatrix = getProjectionMatrix(FOV, (CANVAS_WIDTH) / (CANVAS_HEIGHT * 1.0), 1, 10);
+    let projectionMatrix = getProjectionMatrix(FOV, (CANVAS_WIDTH) / (CANVAS_HEIGHT * 1.0), 0.1, 1);
     gl.uniformMatrix4fv(projectionMatrixLoc, false, projectionMatrix);
     
     let rotationArr = new Float32Array([toRad(rotation.rotX), toRad(rotation.rotY)]);
@@ -364,8 +364,13 @@ function setEvents(){
         }
         else if(key === "a"){
             cameraPos.x += (-1 + Math.sin(toRad(rotation.rotY))) * SPEED;
-            cameraPos.y = Math.sin(toRad(rotation.rotX)) * SPEED;
-            cameraPos.z = (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED; //FIX HERE
+            cameraPos.y += Math.sin(toRad(rotation.rotX)) * SPEED;
+            cameraPos.z += (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED; //FIX HERE
+        }
+        else if(key === "d"){
+            cameraPos.x -= (-1 + Math.sin(toRad(rotation.rotY))) * SPEED;
+            cameraPos.y -= Math.sin(toRad(rotation.rotX)) * SPEED;
+            cameraPos.z -= (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED; //FIX HERE
         }
     }
     window.onmousemove = function(e){
@@ -376,8 +381,8 @@ function setEvents(){
         let rotAngleY = (dy * 180.0) / (CANVAS_HEIGHT);
 
         //add the new angles into existing angle attributes
-        rotation.rotX += rotAngleX;
-        rotation.rotY += rotAngleY;
+        rotation.rotX += rotAngleY * SENSITIVITY;
+        rotation.rotY += rotAngleX * SENSITIVITY;   //add the inverted angles (x to y, y to x) for better experience
 
         //set current client positions as the new mousePos attributes
         mousePos.x = e.x;
