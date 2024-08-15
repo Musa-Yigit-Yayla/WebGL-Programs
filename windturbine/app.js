@@ -220,6 +220,18 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     vertices.set(vertices0);
     vertices.set(vertices1, vertices0.length);
 
+    let wallVertices = new Float32Array(circleVert0.length * 3); //hold first two vertices from c0, then first vertex of c1, 
+    //then hold first two from c0 and second from c1, and then the second pair from c0 and second from c1, and then second pair from c0 and thrid from c1 and so on
+
+    let it = 0; //iterator for wallVertices
+    for(let i = 0; i < vertices0.length; i += 2){
+        for(let j = 0; j < 2; j++){
+            wallVertices[it++] = vertices0[i];
+            wallVertices[it++] = vertices0[i + 1];
+            wallVertices[it++] = vertices1[j];
+        }
+    }
+
     // Set up color data
     let colorArr = new Float32Array(color);
 
@@ -259,6 +271,16 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
 
     // Draw the cylinder
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertices.length / 3);
+
+    //draw rectangular area of the cylinder
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, wallVertices, gl.STATIC_DRAW);
+
+    gl.enableVertexAttribArray(verticesLoc);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, wallVertices, gl.STATIC_DRAW);
+    
+    gl.drawArrays(gl.TRIANGLES, 0, wallVertices.length / 3);
 
     // Check for WebGL errors
     let error = gl.getError();
