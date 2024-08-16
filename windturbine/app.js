@@ -61,9 +61,34 @@ const shaders = {
     }
     `
 };
+
+const skyboxShaders = {
+    fs: 
+    `#version 300 es
+
+    in vec3 vertices;
+    uniform vec2 u_textCoord;
+    
+    void main(){
+        gl_Position = vec4(vertices, 1.0);
+    }`,
+    vs: 
+    `#version300 es
+    precision mediump float;
+
+    uniform sampler2D u_texture;
+
+    void main(){
+        outColor = texture2D(u_texture, u_textCoord);
+    }`
+};
+
 let program;
+let program_skybox;
 let vertexBuffer;
 let colorBuffer;
+let textureSkybox = gl.createTexture();
+let skyboxVertexBuffer;
 
 const CIRCLE_PRECISION = 240;
 
@@ -107,6 +132,16 @@ const rotatingPole = getCylinder(
     0.0, 1.0, 0.0,
     0.1
 ); //upright position
+
+const skybox_vertices = new Float32Array([
+    //left side of cube
+    -1.0, -1.0, -1.0,
+    -1.0, -1.0, 1.0,
+    -1.0, 1.0, 1.0,
+    -1.0, 1.0, 1.0,
+    -1.0, 1.0, -1.0,
+    -1.0, -1.0, -1.0
+]);
 
 function getCone(topX, topY, topZ, baseCenterX, baseCenterY, baseCenterZ, radius){
 
@@ -163,9 +198,13 @@ let toRad = function(degree){
 function renderFrame(){
     console.log("Debug: renderFrame invoked");
 
+    renderSkybox("nebula-skybox.jpg");
+
     //render the main pole
     
-    renderCylinder(mainPole[0], mainPole[1], 0, 0, 0, [0.1, 0.4, 0.0]);
+    //renderCylinder(mainPole[0], mainPole[1], 0, 0, 0, [0.1, 0.4, 0.0]);
+    renderCylinder(orthoPole[0], orthoPole[1], 0, 0, 0, [0.4, 0.4, 0.5]);
+    //renderCylinder(rotatingPole[0], rotatingPole[1], 0, 0, 0, [0.8, 0.0, 0.4]);
     
     requestAnimationFrame(renderFrame);
 }
@@ -213,6 +252,7 @@ function getProjectionMatrix(fov, aspect, near, far) {
 function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     console.log("Debug: renderCylinder invoked with color:", color);
 
+    gl.useProgram(program);
     // Combine vertices
     let vertices0 = new Float32Array(circleVert0.flat());
     let vertices1 = new Float32Array(circleVert1.flat());
@@ -331,8 +371,8 @@ function rotateVertices(vert, tarX, tarY, tarZ) {
 
     return rotatedVert;
 }
-function initProgram(){
-    console.log("Debug: initProgram invoked");
+function initPrograms(){
+    console.log("Debug: initPrograms invoked");
     
     program = gl.createProgram();
     
@@ -362,10 +402,47 @@ function initProgram(){
         const infoLog = gl.getProgramInfoLog(program);
         console.error('WebGL Program Link Error: ', infoLog);
     }
-    gl.useProgram(program);
 
     vertexBuffer = gl.createBuffer();
     colorBuffer = gl.createBuffer();
+
+    //initialize skybox buffers and bind their data
+    skyboxVertexBuffer = gl.createBuffer();
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyboxVertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, skybox_vertices, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(skybox_vertices);
+
+    gl.bindTexture(gl.ARRAY_BUFFER, textureSkybox);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyboxImg);
+    gl.activeTexture(skyboxImg);
+
+    //now initialize skybox program
+    program_skybox = gl.createProgram();
+    
+    let skyboxVS = gl.createShader(gl.VERTEX_SHADER);
+    let skyboxFS = gl.createShader(gl.FRAGMENT_SHADER);
+
+    gl.shaderSource(skyboxVS, shaders.vs);
+    gl.shaderSource(skyboxFS, skyboxShaders.fs);
+
+    gl.compileShader(skyboxVS);
+    gl.compileShader(skyboxFS);
+
+    gl.attachShader(program_skybox, skyboxVS);
+    gl.attachShader(program_skybox, skyboxFS);
+    gl.linkProgram(program);
+}
+
+//given a texture source renders 3D skybox
+function renderSkybox(textureSrc){
+    gl.useProgram(program_skybox);
+    gl.bindTexture(gl.ARRAY_BUFFER, textureSkybox);
+    
+    const texLocation = gl.getUniformLocation(program_skybox, 'u_texture');
+    gl.uniform1i(texLocation, 0);
+
+    
 }
 
 function setEvents(){
@@ -385,14 +462,33 @@ function setEvents(){
             cameraPos.z -= (-1 + Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED;
         }
         else if(key === "a"){
+            cameraPos.x -= (-1 + Math.sin(toRad(rotation.rotY))) * SPEED;
+            cameraPos.y -= Math.sin(toRad(rotation.rotX)) * SPEED;
+            cameraPos.z -= (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED; //FIX HERE
+        }
+        else if(key === "d"){
             cameraPos.x += (-1 + Math.sin(toRad(rotation.rotY))) * SPEED;
             cameraPos.y += Math.sin(toRad(rotation.rotX)) * SPEED;
             cameraPos.z += (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED; //FIX HERE
         }
-        else if(key === "d"){
-            cameraPos.x -= (-1 + Math.sin(toRad(rotation.rotY))) * SPEED;
-            cameraPos.y -= Math.sin(toRad(rotation.rotX)) * SPEED;
-            cameraPos.z -= (Math.sin(toRad(rotation.rotX)) + Math.sin(toRad(rotation.rotY))) * SPEED; //FIX HERE
+
+        if(cameraPos.x > 1.0){
+            cameraPos.x = 1.0;
+        }
+        else if(cameraPos.x < -1.0){
+            cameraPos.x = -1.0;
+        }
+        if(cameraPos.y > 1.0){
+            cameraPos.y = 1.0;
+        }
+        else if(cameraPos.y < -1.0){
+            cameraPos.y = -1.0;
+        }
+        if(cameraPos.z > 1.0){
+            cameraPos.z = 1.0;
+        }
+        else if(cameraPos.z < -1.0){
+            cameraPos.z = -1.0;
         }
     }
     window.onmousemove = function(e){
@@ -412,8 +508,18 @@ function setEvents(){
     }
 }
 
+let skyboxImg = new Image();
+    skyboxImg.src = "nebula-skybox.jpg";
+
+    skyboxImg.onload = e => {
+        gl.bindTexture(gl.TEXTURE_2D, textureSkybox);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyboxImg);
+        gl.generateMipmap(gl.TEXTURE_2D);
+
+    };
+
 setEvents();
-initProgram();
+initPrograms();
 renderFrame();
 
 
