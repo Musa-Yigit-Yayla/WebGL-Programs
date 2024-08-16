@@ -83,7 +83,7 @@ const skyboxShaders = {
         float radX = rotation[0];
         float radY = rotation[1];
 
-        texPos = textcoord;
+        texpos = textcoord;
         gl_Position = projectionMatrix * viewMatrix * vec4(relativeX, relativeY, relativeZ, 1.0);
     }`,
     fs: 
@@ -355,9 +355,10 @@ function renderSkybox(textureSrc){
     gl.enableVertexAttribArray(skyboxVertLoc);
     gl.vertexAttribPointer(skybox_vertices, 3, gl.FLOAT, false, 0, 0);
 
-    gl.bindTexture(gl.ARRAY_BUFFER, textureSkybox);
+    gl.bindTexture(gl.TEXTURE_2D, textureSkybox);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyboxImg);
-    gl.activeTexture(skyboxImg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.generateMipmap(gl.TEXTURE_2D);
     
     const texLocation = gl.getUniformLocation(program_skybox, 'u_texture');
     gl.uniform1i(texLocation, 0);
@@ -365,7 +366,7 @@ function renderSkybox(textureSrc){
     //bind the remaining uniforms
     let cameraPosArrNormal = [cameraPos.x, cameraPos.y, cameraPos.z]
     let cameraPosArr = new Float32Array(cameraPosArrNormal);
-    let cameraPosLoc = gl.getUniformLocation(program, 'cameraPos');
+    let cameraPosLoc = gl.getUniformLocation(program_skybox, 'cameraPos');
     gl.uniform3fv(cameraPosLoc, cameraPosArr);
 
     let viewMatrixLoc = gl.getUniformLocation(program_skybox, 'viewMatrix');
@@ -388,7 +389,7 @@ function renderSkybox(textureSrc){
         1.0, 0.0,
         1.0, 1.0,
         0.0, 1.0
-    ]), 2, gl.STATIC_DRAW);
+    ]) , gl.STATIC_DRAW);
 
     let textcoordLoc = gl.getAttribLocation(program_skybox, 'textcoord');
     gl.enableVertexAttribArray(textcoordLoc);
@@ -482,7 +483,7 @@ function initPrograms(){
     let skyboxVS = gl.createShader(gl.VERTEX_SHADER);
     let skyboxFS = gl.createShader(gl.FRAGMENT_SHADER);
 
-    gl.shaderSource(skyboxVS, shaders.vs);
+    gl.shaderSource(skyboxVS, skyboxShaders.vs);
     gl.shaderSource(skyboxFS, skyboxShaders.fs);
 
     gl.compileShader(skyboxVS);
