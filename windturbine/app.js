@@ -63,23 +63,39 @@ const shaders = {
 };
 
 const skyboxShaders = {
-    fs: 
+    vs: 
     `#version 300 es
 
     in vec3 vertices;
-    uniform vec2 u_textCoord;
-    
+    in vec2 textcoord;
+    out vec2 texpos;
+    uniform vec3 cameraPos;
+    uniform mat4 viewMatrix;
+    uniform mat4 projectionMatrix;
+
+    uniform vec2 rotation;
+
     void main(){
-        gl_Position = vec4(vertices, 1.0);
+        float relativeZ = vertices[2] - cameraPos[2];
+        float relativeX = (vertices[0] - cameraPos[0]) / (relativeZ);
+        float relativeY = (vertices[1] - cameraPos[1]) / (relativeZ); //divide x and y by z to obtain close-far perspective
+        
+        float radX = rotation[0];
+        float radY = rotation[1];
+
+        texPos = textcoord;
+        gl_Position = projectionMatrix * viewMatrix * vec4(relativeX, relativeY, relativeZ, 1.0);
     }`,
-    vs: 
-    `#version300 es
+    fs: 
+    `#version 300 es
     precision mediump float;
 
+    in vec2 texpos;
     uniform sampler2D u_texture;
+    out vec4 outColor;
 
     void main(){
-        outColor = texture2D(u_texture, u_textCoord);
+        outColor = texture(u_texture, texpos);
     }`
 };
 
@@ -89,6 +105,7 @@ let vertexBuffer;
 let colorBuffer;
 let textureSkybox = gl.createTexture();
 let skyboxVertexBuffer;
+let texPosBuffer; // for skybox
 
 const CIRCLE_PRECISION = 240;
 
@@ -306,8 +323,6 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     let rotationLoc = gl.getUniformLocation(program, 'rotation');
     gl.uniform2fv(rotationLoc, rotationArr);
 
-    // Clear the canvas
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // Draw the cylinder
     gl.drawArrays(gl.TRIANGLE_FAN, 0, vertices.length / 3);
@@ -327,6 +342,57 @@ function renderCylinder(circleVert0, circleVert1, rotX, rotY, rotZ, color) {
     if (error !== gl.NO_ERROR) {
         console.error('WebGL Error:', error);
     }
+}
+
+//given a texture source renders 3D skybox
+function renderSkybox(textureSrc){
+    gl.useProgram(program_skybox);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, skyboxVertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, skybox_vertices, gl.STATIC_DRAW);
+
+    const skyboxVertLoc = gl.getAttribLocation(program_skybox, 'vertices');
+    gl.enableVertexAttribArray(skyboxVertLoc);
+    gl.vertexAttribPointer(skybox_vertices, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindTexture(gl.ARRAY_BUFFER, textureSkybox);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyboxImg);
+    gl.activeTexture(skyboxImg);
+    
+    const texLocation = gl.getUniformLocation(program_skybox, 'u_texture');
+    gl.uniform1i(texLocation, 0);
+
+    //bind the remaining uniforms
+    let cameraPosArrNormal = [cameraPos.x, cameraPos.y, cameraPos.z]
+    let cameraPosArr = new Float32Array(cameraPosArrNormal);
+    let cameraPosLoc = gl.getUniformLocation(program, 'cameraPos');
+    gl.uniform3fv(cameraPosLoc, cameraPosArr);
+
+    let viewMatrixLoc = gl.getUniformLocation(program_skybox, 'viewMatrix');
+    let viewMatrix = getViewMatrix(cameraPosArrNormal, rotation.rotX, rotation.rotY);
+    gl.uniformMatrix4fv(viewMatrixLoc, false, viewMatrix);
+
+    let projectionMatrixLoc = gl.getUniformLocation(program_skybox, 'projectionMatrix');
+    let projectionMatrix = getProjectionMatrix(FOV, (CANVAS_WIDTH) / (CANVAS_HEIGHT * 1.0), 0.1, 1);
+    gl.uniformMatrix4fv(projectionMatrixLoc, false, projectionMatrix);
+    
+    let rotationArr = new Float32Array([toRad(rotation.rotX), toRad(rotation.rotY)]);
+    let rotationLoc = gl.getUniformLocation(program_skybox, 'rotation');
+    gl.uniform2fv(rotationLoc, rotationArr);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, texPosBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        0.0, 1.0,
+        0.0, 0.0,
+        1.0, 0.0,
+        1.0, 0.0,
+        1.0, 1.0,
+        0.0, 1.0
+    ]), 2, gl.STATIC_DRAW);
+
+    let textcoordLoc = gl.getAttribLocation(program_skybox, 'textcoord');
+    gl.enableVertexAttribArray(textcoordLoc);
+    gl.vertexAttribPointer(textcoordLoc, 12, gl.FLOAT, false, 0, 0);
 }
 
 /**
@@ -406,16 +472,9 @@ function initPrograms(){
     vertexBuffer = gl.createBuffer();
     colorBuffer = gl.createBuffer();
 
-    //initialize skybox buffers and bind their data
+    //initialize skybox buffers
     skyboxVertexBuffer = gl.createBuffer();
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, skyboxVertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, skybox_vertices, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(skybox_vertices);
-
-    gl.bindTexture(gl.ARRAY_BUFFER, textureSkybox);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, skyboxImg);
-    gl.activeTexture(skyboxImg);
+    texPosBuffer = gl.createBuffer();
 
     //now initialize skybox program
     program_skybox = gl.createProgram();
@@ -429,21 +488,25 @@ function initPrograms(){
     gl.compileShader(skyboxVS);
     gl.compileShader(skyboxFS);
 
+    if (!gl.getShaderParameter(skyboxVS, gl.COMPILE_STATUS)) {
+        console.error('Skybox Vertex Shader Compile Error:', gl.getShaderInfoLog(skyboxVS));
+        return;
+    }
+    if (!gl.getShaderParameter(skyboxFS, gl.COMPILE_STATUS)) {
+        console.error('Skybox Fragment Shader Compile Error:', gl.getShaderInfoLog(skyboxFS));
+        return;
+    }
+
     gl.attachShader(program_skybox, skyboxVS);
     gl.attachShader(program_skybox, skyboxFS);
-    gl.linkProgram(program);
+    gl.linkProgram(program_skybox);
+
+    if(!gl.getProgramParameter(program_skybox, gl.LINK_STATUS)){
+        const infoLog = gl.getProgramInfoLog(program_skybox);
+        console.log("Skybox program link error: ", infoLog);
+    }
 }
 
-//given a texture source renders 3D skybox
-function renderSkybox(textureSrc){
-    gl.useProgram(program_skybox);
-    gl.bindTexture(gl.ARRAY_BUFFER, textureSkybox);
-    
-    const texLocation = gl.getUniformLocation(program_skybox, 'u_texture');
-    gl.uniform1i(texLocation, 0);
-
-    
-}
 
 function setEvents(){
     //update camera pos with respect to current set rotations
